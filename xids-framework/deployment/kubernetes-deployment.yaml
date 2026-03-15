@@ -1,0 +1,364 @@
+# Kubernetes Deployment for X-IDS with sidecar pattern
+# Deploy with: kubectl apply -f kubernetes-deployment.yaml
+
+---
+# Namespace for X-IDS
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: x-ids
+  labels:
+    name: x-ids
+
+---
+# ConfigMap for X-IDS configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: x-ids-config
+  namespace: x-ids
+data:
+  config.yaml: |
+    training:
+      num_epochs: 50
+      batch_size: 32
+      learning_rate: 0.001
+      early_stopping_patience: 10
+    tcn:
+      filters: [64, 128, 256]
+      kernel_size: 3
+      dropout: 0.2
+    autoencoder:
+      latent_dim: 16
+      dropout: 0.2
+    random_forest:
+      n_estimators: 100
+      max_depth: 20
+
+---
+# PersistentVolumeClaim for models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x-ids-models-pvc
+  namespace: x-ids
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# PersistentVolumeClaim for logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: x-ids-logs-pvc
+  namespace: x-ids
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Service Account for X-IDS
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: x-ids-sa
+  namespace: x-ids
+
+---
+# RBAC Role for X-IDS
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: x-ids-role
+  namespace: x-ids
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+---
+# RBAC RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: x-ids-rolebinding
+  namespace: x-ids
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: x-ids-role
+subjects:
+  - kind: ServiceAccount
+    name: x-ids-sa
+    namespace: x-ids
+
+---
+# Deployment for X-IDS (Sidecar Pattern)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x-ids-deployment
+  namespace: x-ids
+  labels:
+    app: x-ids
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: x-ids
+  template:
+    metadata:
+      labels:
+        app: x-ids
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: x-ids-sa
+      
+      # Init container: Download models
+      initContainers:
+        - name: model-downloader
+          image: alpine:latest
+          command: ["sh", "-c", "echo 'Models initialized' && mkdir -p /models"]
+          volumeMounts:
+            - name: models-volume
+              mountPath: /models
+      
+      # Main application container
+      containers:
+        - name: x-ids
+          image: x-ids:latest
+          imagePullPolicy: IfNotPresent
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          
+          env:
+            - name: MODEL_DIR
+              value: "/data/models"
+            - name: LOG_DIR
+              value: "/data/logs"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          
+          volumeMounts:
+            - name: models-volume
+              mountPath: /data/models
+            - name: logs-volume
+              mountPath: /data/logs
+            - name: config-volume
+              mountPath: /etc/x-ids
+          
+          # Resource requests and limits
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          
+          # Liveness probe
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Readiness probe
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+        
+        # Prometheus metrics exporter sidecar (optional)
+        - name: metrics-exporter
+          image: prom/prometheus:latest
+          ports:
+            - name: prometheus
+              containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+      
+      # Volumes
+      volumes:
+        - name: models-volume
+          persistentVolumeClaim:
+            claimName: x-ids-models-pvc
+        - name: logs-volume
+          persistentVolumeClaim:
+            claimName: x-ids-logs-pvc
+        - name: config-volume
+          configMap:
+            name: x-ids-config
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+      
+      # Pod Disruption Budget for high availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - x-ids
+                topologyKey: kubernetes.io/hostname
+
+---
+# Service for X-IDS API
+apiVersion: v1
+kind: Service
+metadata:
+  name: x-ids-service
+  namespace: x-ids
+  labels:
+    app: x-ids
+spec:
+  type: LoadBalancer
+  selector:
+    app: x-ids
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+---
+# HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: x-ids-hpa
+  namespace: x-ids
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: x-ids-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: x-ids-pdb
+  namespace: x-ids
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: x-ids
+
+---
+# NetworkPolicy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: x-ids-netpol
+  namespace: x-ids
+spec:
+  podSelector:
+    matchLabels:
+      app: x-ids
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: x-ids
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53  # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS

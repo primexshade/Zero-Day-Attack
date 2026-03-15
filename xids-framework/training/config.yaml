@@ -1,0 +1,123 @@
+# X-IDS Training Configuration
+
+# Data Configuration
+data:
+  datasets:
+    - cicids2017
+    - unswnb15
+  test_split: 0.2
+  val_split: 0.1
+  random_state: 42
+  max_samples: null  # Set to limit samples for quick testing
+
+# Preprocessing Configuration
+preprocessing:
+  normalize: true
+  normalization_method: "minmax"  # "minmax", "standard", "robust"
+  handle_missing: true
+  missing_strategy: "mean"  # "mean", "median", "drop"
+  feature_selection: true
+  n_features_select: 50
+
+# Class Imbalance Handling
+imbalance:
+  method: "smote"  # "smote", "adasyn", "class_weights", "combined"
+  random_state: 42
+  smote:
+    k_neighbors: 5
+    sampling_strategy: 0.3  # Ratio of minority to majority
+  adasyn:
+    n_neighbors: 5
+    sampling_strategy: 0.3
+
+# Model Configuration - TCN
+tcn:
+  name: "TCN"
+  input_shape: [None, 50]  # [timesteps, features]
+  num_filters: 64
+  kernel_size: 3
+  num_layers: 3
+  dropout: 0.3
+  activation: "relu"
+  output_units: 1
+  output_activation: "sigmoid"
+
+# Model Configuration - Autoencoder
+autoencoder:
+  name: "VariationalAutoencoder"
+  input_dim: 50
+  latent_dim: 16
+  encoder_layers: [128, 64]
+  decoder_layers: [64, 128]
+  dropout: 0.2
+  activation: "relu"
+  loss: "mse"  # "mse", "bce"
+
+# Model Configuration - Random Forest
+random_forest:
+  name: "RandomForest"
+  n_estimators: 500
+  max_depth: 20
+  min_samples_split: 5
+  min_samples_leaf: 2
+  random_state: 42
+  n_jobs: -1
+
+# Training Configuration
+training:
+  batch_size: 32
+  num_epochs: 100
+  early_stopping: true
+  early_stopping_patience: 10
+  learning_rate: 0.001
+  optimizer: "adam"  # "adam", "sgd", "rmsprop"
+  loss_function: "binary_crossentropy"
+  metrics: ["accuracy", "precision", "recall"]
+  shuffle: true
+  verbose: 1
+
+# Callbacks Configuration
+callbacks:
+  reduce_lr_on_plateau:
+    enabled: true
+    factor: 0.5
+    patience: 5
+    min_lr: 0.00001
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1_score
+    - roc_auc
+    - confusion_matrix
+  generate_plots: true
+  output_dir: "results/"
+
+# Explainability Configuration
+explainability:
+  shap:
+    enabled: true
+    explainer_type: "kernel"  # "kernel", "gradient", "sampling"
+    background_samples: 100
+    num_samples: 2048
+  
+  lime:
+    enabled: true
+    num_samples: 1000
+    kernel_width: 0.25
+
+# Inference Configuration
+inference:
+  batch_size: 32
+  max_latency_ms: 100
+  alert_threshold: 0.7
+  explanation_threshold: 0.8
+
+# Deployment Configuration
+deployment:
+  model_format: "saved_model"  # "saved_model", "onnx", "tflite"
+  quantization: false
+  hardware: "cpu"  # "cpu", "gpu", "tpu"

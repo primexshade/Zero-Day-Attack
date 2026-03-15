@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "public": true,
+  "buildCommand": "pip install -r requirements.txt",
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "routes": [
+    {
+      "src": "^/api/predict",
+      "dest": "/api/predict.py",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "^/api/batch",
+      "dest": "/api/batch.py",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "^/api/health",
+      "dest": "/api/health.py",
+      "methods": ["GET", "OPTIONS"]
+    },
+    {
+      "src": "^/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "functions": {
+    "api/predict.py": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/batch.py": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/health.py": {
+      "memory": 512,
+      "maxDuration": 10
+    }
+  }
+}
