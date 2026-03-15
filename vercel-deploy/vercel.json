@@ -1,29 +1,21 @@
 {
   "version": 2,
-  "public": true,
   "buildCommand": "pip install -r requirements.txt",
   "env": {
     "PYTHONUNBUFFERED": "1"
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/api/predict",
-      "dest": "/api/predict.py",
-      "methods": ["POST", "OPTIONS"]
+      "source": "/api/predict",
+      "destination": "/api/predict.py"
     },
     {
-      "src": "^/api/batch",
-      "dest": "/api/batch.py",
-      "methods": ["POST", "OPTIONS"]
+      "source": "/api/batch",
+      "destination": "/api/batch.py"
     },
     {
-      "src": "^/api/health",
-      "dest": "/api/health.py",
-      "methods": ["GET", "OPTIONS"]
-    },
-    {
-      "src": "^/(.*)",
-      "dest": "/public/$1"
+      "source": "/api/health",
+      "destination": "/api/health.py"
     }
   ],
   "functions": {
