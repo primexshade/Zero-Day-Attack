@@ -5,7 +5,6 @@ Handles threat detection requests from frontend
 
 import json
 import os
-import sys
 import numpy as np
 from datetime import datetime
 
@@ -96,7 +95,6 @@ def predict_single(features, models):
             features_reshaped = features_array.reshape(1, 77)
             reconstructed = models['vae'].predict(features_reshaped, verbose=0)
             mse = np.mean((features_array - reconstructed) ** 2)
-            # Map reconstruction error to class
             pred_class = min(5, int(mse * 10))
             confidence = max(50, min(100, (1 - mse) * 100))
             predictions['vae'] = pred_class
@@ -106,52 +104,61 @@ def predict_single(features, models):
     
     return predictions, confidences
 
-def handler(request):
-    """Main handler function"""
+def handler(req, resp):
+    """Vercel serverless handler"""
     
     # CORS headers
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    resp.headers['Content-Type'] = 'application/json'
     
     # Handle OPTIONS
-    if request.method == 'OPTIONS':
-        return ('', 204, headers)
+    if req.method == 'OPTIONS':
+        resp.status_code = 204
+        return
     
     # Only POST allowed
-    if request.method != 'POST':
-        return (json.dumps({
+    if req.method != 'POST':
+        resp.status_code = 405
+        resp.text = json.dumps({
             'error': 'Method not allowed',
             'allowed': ['POST']
-        }), 405, headers)
+        })
+        return
     
     try:
-        data = json.loads(request.get_data(as_text=True))
+        data = req.json
     except:
-        return (json.dumps({'error': 'Invalid JSON'}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': 'Invalid JSON'})
+        return
     
     # Get features
     features = data.get('features')
     if not features:
-        return (json.dumps({'error': 'Missing features'}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': 'Missing features'})
+        return
     
     # Validate
     valid, result = validate_features(features)
     if not valid:
-        return (json.dumps({'error': result}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': result})
+        return
     
     features = result
     
     # Load models
     models = load_models()
     if not models:
-        return (json.dumps({
+        resp.status_code = 503
+        resp.text = json.dumps({
             'error': 'Models not loaded',
             'note': 'Deploy with model files in /api/../models/'
-        }), 503, headers)
+        })
+        return
     
     # Predict
     try:
@@ -180,22 +187,11 @@ def handler(request):
             ][final_pred]
         }
         
-        return (json.dumps(response), 200, headers)
+        resp.status_code = 200
+        resp.text = json.dumps(response)
     
     except Exception as e:
-        return (json.dumps({
+        resp.status_code = 500
+        resp.text = json.dumps({
             'error': f'Prediction failed: {str(e)}'
-        }), 500, headers)
-
-
-# For local testing
-if __name__ == '__main__':
-    from werkzeug.wrappers import Request, Response
-    
-    @Request.application
-    def app(request):
-        status, body, response_headers = handler(request)
-        return Response(body, status=status, headers=response_headers)
-    
-    from werkzeug.serving import run_simple
-    run_simple('localhost', 5000, app, use_reloader=True)
+        })

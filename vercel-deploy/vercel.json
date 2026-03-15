@@ -3,33 +3,5 @@
   "buildCommand": "pip install -r requirements.txt",
   "env": {
     "PYTHONUNBUFFERED": "1"
-  },
-  "rewrites": [
-    {
-      "source": "/api/predict",
-      "destination": "/api/predict.py"
-    },
-    {
-      "source": "/api/batch",
-      "destination": "/api/batch.py"
-    },
-    {
-      "source": "/api/health",
-      "destination": "/api/health.py"
-    }
-  ],
-  "functions": {
-    "api/predict.py": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/batch.py": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/health.py": {
-      "memory": 512,
-      "maxDuration": 10
-    }
   }
 }

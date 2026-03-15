@@ -1,19 +1,16 @@
 """
-Health check endpoint
+Vercel Serverless Function: Health Check Endpoint
 """
 
 import json
-import os
-from predict import load_models
 from datetime import datetime
+from predict import load_models
 
-def handler(request):
+def handler(req, resp):
     """Health check"""
     
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-    }
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Content-Type'] = 'application/json'
     
     models = load_models()
     models_loaded = list(models.keys())
@@ -25,4 +22,5 @@ def handler(request):
         'version': '1.0.0'
     }
     
-    return (json.dumps(response), 200, headers)
+    resp.status_code = 200
+    resp.text = json.dumps(response)

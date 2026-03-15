@@ -9,38 +9,47 @@ import numpy as np
 from datetime import datetime
 from predict import load_models, validate_features, predict_single
 
-def handler(request):
+def handler(req, resp):
     """Batch prediction handler"""
     
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    resp.headers['Content-Type'] = 'application/json'
     
-    if request.method == 'OPTIONS':
-        return ('', 204, headers)
+    if req.method == 'OPTIONS':
+        resp.status_code = 204
+        return
     
-    if request.method != 'POST':
-        return (json.dumps({'error': 'Method not allowed'}), 405, headers)
+    if req.method != 'POST':
+        resp.status_code = 405
+        resp.text = json.dumps({'error': 'Method not allowed'})
+        return
     
     try:
-        data = json.loads(request.get_data(as_text=True))
+        data = req.json
     except:
-        return (json.dumps({'error': 'Invalid JSON'}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': 'Invalid JSON'})
+        return
     
     features_list = data.get('features_list', [])
     if not features_list:
-        return (json.dumps({'error': 'Missing features_list'}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': 'Missing features_list'})
+        return
     
     if not isinstance(features_list, list):
-        return (json.dumps({'error': 'features_list must be array'}), 400, headers)
+        resp.status_code = 400
+        resp.text = json.dumps({'error': 'features_list must be array'})
+        return
     
     # Load models
     models = load_models()
     if not models:
-        return (json.dumps({'error': 'Models not loaded'}), 503, headers)
+        resp.status_code = 503
+        resp.text = json.dumps({'error': 'Models not loaded'})
+        return
     
     results = []
     errors = []
@@ -95,4 +104,5 @@ def handler(request):
     if errors:
         response['error_details'] = errors
     
-    return (json.dumps(response), 200, headers)
+    resp.status_code = 200
+    resp.text = json.dumps(response)
