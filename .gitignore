@@ -46,3 +46,8 @@ dist/
 build/
 pip-wheel-metadata/
 *.egg-info/
+# Internal/private markdown files
+ENV_SECRETS_GUIDE.md
+PRODUCTION_STATUS.md
+DEPLOYMENT_FINAL_PLAN.md
+DEPLOYMENT_PROCESS.md
