@@ -1,2 +1,48 @@
 # Claude-generated documentation
 claude_docs/
+# Secrets and local configs
+.env
+.env.*
+.env.local
+xids-framework/.env
+
+# TLS certificates and keys
+*.pem
+*.key
+*.crt
+*.pfx
+*.jks
+
+# Logs and runtime data
+*.log
+logs/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.envrc
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Node & JS
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build & distribution
+dist/
+build/
+pip-wheel-metadata/
+*.egg-info/
