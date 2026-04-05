@@ -1,0 +1,66 @@
+# Default Configuration for X-IDS
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  reload: false
+
+# Model Configuration
+models:
+  default: "rf"
+  models_dir: "/app/models"
+  autoload: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "/var/log/xids/api.log"
+
+# Database Configuration
+database:
+  url: "postgresql://user:password@localhost:5432/xids"
+  pool_size: 20
+  max_overflow: 10
+
+# Kafka Configuration
+kafka:
+  bootstrap_servers: "localhost:9092"
+  consumer_group: "xids-inference"
+  topics:
+    - "network-traffic"
+    - "threat-alerts"
+
+# SIEM Configuration
+siem:
+  elasticsearch:
+    enabled: false
+    host: "localhost"
+    port: 9200
+  splunk:
+    enabled: false
+    host: "localhost"
+    port: 8089
+
+# Security Configuration
+security:
+  jwt_secret: "change-in-production"
+  jwt_expiry_hours: 24
+  rate_limit_per_minute: 100
+  enable_tls: false
+  tls_cert: "/etc/xids/cert.pem"
+  tls_key: "/etc/xids/key.pem"
+
+# Performance Configuration
+performance:
+  batch_size: 32
+  num_workers: 4
+  use_gpu: false
+
+# Monitoring Configuration
+monitoring:
+  prometheus_enabled: true
+  prometheus_port: 9090
+  metrics_path: "/metrics"

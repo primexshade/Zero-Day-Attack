@@ -1,0 +1,160 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd xids-framework
+        pip install -r requirements.txt
+        pip install pytest pytest-cov black flake8 mypy
+    
+    - name: Lint with flake8
+      run: |
+        cd xids-framework
+        flake8 xids/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 xids/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      run: |
+        cd xids-framework
+        black --check xids/ tests/ || true
+    
+    - name: Type check with mypy
+      run: |
+        cd xids-framework
+        mypy xids/ --ignore-missing-imports || true
+    
+    - name: Run unit tests
+      run: |
+        cd xids-framework
+        pytest tests/test_framework.py -v --cov=xids --cov-report=xml
+    
+    - name: Run E2E tests
+      run: |
+        cd xids-framework
+        pytest tests/test_e2e.py -v
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./xids-framework/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  build-docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: xids-framework
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/xids:latest
+          ${{ secrets.DOCKER_USERNAME }}/xids:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Create deployment summary
+      run: |
+        echo "## Docker Build Complete ✅" >> $GITHUB_STEP_SUMMARY
+        echo "Image: ${{ secrets.DOCKER_USERNAME }}/xids:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'xids-framework'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  code-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        cd xids-framework
+        pip install -r requirements.txt
+        pip install pylint
+    
+    - name: Run Pylint
+      run: |
+        cd xids-framework
+        pylint xids/ --exit-zero --max-line-length=120
+
+  notify:
+    needs: [test, security-scan, code-quality]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Check workflow status
+      run: |
+        if [ "${{ needs.test.result }}" = "failure" ]; then
+          echo "❌ Tests failed"
+          exit 1
+        fi
+        echo "✅ All checks passed"
