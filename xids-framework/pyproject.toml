@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xids"
+version = "1.0.0"
+description = "X-IDS: Explainable Deep Learning Intrusion Detection System"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "XIDS Team", email = "team@xids.ai"}
+]
+keywords = ["intrusion-detection", "deep-learning", "cybersecurity", "explainability"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
+
+dependencies = [
+    "numpy>=1.20.0",
+    "pandas>=1.3.0",
+    "scikit-learn>=1.0.0",
+    "tensorflow>=2.10.0",
+    "torch>=1.10.0",
+    "fastapi>=0.95.0",
+    "uvicorn>=0.21.0",
+    "pydantic>=1.10.0",
+    "kafka-python>=2.0.0",
+    "elasticsearch>=8.0.0",
+    "splunk-sdk>=1.7.0",
+    "shap>=0.41.0",
+    "lime>=0.2.0",
+    "PyJWT>=2.6.0",
+    "python-multipart>=0.0.5",
+    "pyyaml>=6.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "pytest-asyncio>=0.20.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.950",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "pytest-asyncio>=0.20.0",
+    "locust>=2.0.0",
+]
+docs = [
+    "sphinx>=5.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/xids/framework"
+Documentation = "https://xids.readthedocs.io"
+Repository = "https://github.com/xids/framework.git"
+"Bug Tracker" = "https://github.com/xids/framework/issues"
+
+[tool.setuptools]
+packages = ["xids"]
+
+[tool.setuptools.package-data]
+xids = ["configs/*.yaml", "api/openapi.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["xids"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
