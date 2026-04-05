@@ -5,6 +5,7 @@ Integrates X-IDS with ELK Stack for real-time threat visibility
 
 import logging
 import json
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
@@ -22,11 +23,32 @@ logger = logging.getLogger(__name__)
 class ElasticsearchConnector:
     """Connect X-IDS to Elasticsearch"""
     
-    def __init__(self, hosts: List[str], index_prefix: str = "xids"):
-        """Initialize Elasticsearch connector"""
-        self.hosts = hosts
+    def __init__(self, hosts: List[str] = None, index_prefix: str = "xids", 
+                 api_key: str = None, username: str = None, password: str = None,
+                 ca_certs: str = None, verify_certs: bool = True):
+        """
+        Initialize Elasticsearch connector with authentication
+        
+        Args:
+            hosts: Elasticsearch hosts (default: ['localhost:9200'])
+            index_prefix: Index prefix for X-IDS data
+            api_key: API key for authentication (preferred)
+            username: Username for basic auth
+            password: Password for basic auth
+            ca_certs: Path to CA certificate file
+            verify_certs: Whether to verify SSL certificates
+        """
+        self.hosts = hosts or ['localhost:9200']
         self.index_prefix = index_prefix
         self.es = None
+        
+        # Get credentials from environment variables if not provided
+        self.api_key = api_key or os.getenv('ES_API_KEY')
+        self.username = username or os.getenv('ES_USERNAME')
+        self.password = password or os.getenv('ES_PASSWORD')
+        self.ca_certs = ca_certs or os.getenv('ES_CA_CERTS')
+        self.verify_certs = verify_certs and (self.ca_certs is not None or 
+                                              os.getenv('ES_VERIFY_CERTS', '').lower() != 'false')
         
         if not ES_AVAILABLE:
             logger.warning("elasticsearch-py not installed. Run: pip install elasticsearch")
@@ -36,15 +58,36 @@ class ElasticsearchConnector:
         self._create_mappings()
     
     def connect(self):
-        """Connect to Elasticsearch"""
+        """Connect to Elasticsearch with authentication"""
         try:
-            self.es = Elasticsearch(self.hosts, request_timeout=30)
+            kwargs = {
+                'hosts': self.hosts,
+                'request_timeout': 30,
+                'verify_certs': self.verify_certs
+            }
+            
+            # Configure authentication
+            if self.api_key:
+                kwargs['api_key'] = self.api_key
+                logger.info("Using API key authentication")
+            elif self.username and self.password:
+                kwargs['basic_auth'] = (self.username, self.password)
+                logger.info(f"Using basic auth for user: {self.username}")
+            else:
+                logger.warning("No authentication configured for Elasticsearch")
+            
+            # Configure SSL/TLS
+            if self.ca_certs and os.path.exists(self.ca_certs):
+                kwargs['ca_certs'] = self.ca_certs
+                logger.info(f"Using CA certificate: {self.ca_certs}")
+            
+            self.es = Elasticsearch(**kwargs)
             if self.es.ping():
-                logger.info(f"Connected to Elasticsearch: {self.hosts}")
+                logger.info(f"✅ Connected to Elasticsearch: {self.hosts}")
             else:
                 logger.warning("Could not ping Elasticsearch")
         except Exception as e:
-            logger.error(f"Elasticsearch connection failed: {e}")
+            logger.error(f"❌ Elasticsearch connection failed: {e}")
     
     def _create_mappings(self):
         """Create index mappings"""

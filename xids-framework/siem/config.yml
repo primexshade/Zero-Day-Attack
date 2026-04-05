@@ -1,0 +1,90 @@
+# SIEM Authentication Configuration
+# Configure this file with your Elasticsearch and Splunk credentials
+
+elasticsearch:
+  # Elasticsearch connection settings
+  hosts:
+    - host: localhost
+      port: 9200
+      scheme: https
+  
+  # Authentication
+  auth:
+    enabled: true
+    username: ${ES_USERNAME:-elastic}
+    password: ${ES_PASSWORD:-changeme}
+    api_key: ${ES_API_KEY:-}  # Alternative to username/password
+  
+  # SSL/TLS Configuration
+  ssl:
+    enabled: true
+    verify_certs: true
+    ca_certs: ${ES_CA_PATH:-/etc/ssl/certs/ca.crt}
+    client_cert: ${ES_CLIENT_CERT:-}
+    client_key: ${ES_CLIENT_KEY:-}
+  
+  # Index settings
+  index:
+    name: xids-alerts
+    prefix: xids-
+    daily: true
+    retention_days: 90
+  
+  # Batch settings
+  batch_size: 100
+  flush_interval_seconds: 5
+
+splunk:
+  # Splunk HEC (HTTP Event Collector) settings
+  hec:
+    host: ${SPLUNK_HEC_HOST:-localhost}
+    port: ${SPLUNK_HEC_PORT:-8088}
+    token: ${SPLUNK_HEC_TOKEN:-}
+  
+  # SSL/TLS Configuration
+  ssl:
+    enabled: true
+    verify: true
+    ca_path: ${SPLUNK_CA_PATH:-}
+    client_cert: ${SPLUNK_CLIENT_CERT:-}
+    client_key: ${SPLUNK_CLIENT_KEY:-}
+  
+  # Event settings
+  event:
+    sourcetype: xids:alert
+    source: xids-framework
+    index: security
+  
+  # Connection settings
+  timeout: 30
+  max_retries: 3
+
+# Global settings
+global:
+  # Which SIEM to use: 'elasticsearch', 'splunk', or 'both'
+  siem_type: both
+  
+  # Alert enrichment
+  enrichment:
+    add_geoip: true
+    add_threat_intel: true
+    add_asset_info: true
+  
+  # Deduplication
+  deduplication:
+    enabled: true
+    window_minutes: 5
+    key_fields:
+      - source_ip
+      - dest_ip
+      - alert_type
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    alerts_per_second: 100
+    
+  # Logging
+  logging:
+    level: INFO
+    format: json

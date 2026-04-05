@@ -198,19 +198,23 @@ class TestExplainability:
         
         return model, X_train, X_test
     
-    def test_shap_explainer_initialization(self):
+    def test_shap_explainer_initialization(self, sample_model_and_data):
         """Test SHAP explainer initialization."""
         from xids.explainability.shap_explainer import SHAPExplainer
         
-        explainer = SHAPExplainer()
+        model, X_train, X_test = sample_model_and_data
+        explainer = SHAPExplainer(model=model)
         assert explainer is not None
+        assert explainer.model is not None
     
-    def test_lime_explainer_initialization(self):
+    def test_lime_explainer_initialization(self, sample_model_and_data):
         """Test LIME explainer initialization."""
         from xids.explainability.lime_explainer import LIMEExplainer
         
-        explainer = LIMEExplainer()
+        model, X_train, X_test = sample_model_and_data
+        explainer = LIMEExplainer(model=model)
         assert explainer is not None
+        assert explainer.model is not None
 
 
 class TestDataLoaders:
